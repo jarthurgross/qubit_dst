@@ -17,7 +17,7 @@ def z_state(anc_outcome, phi):
        \vert\psi\rangle=\frac{\vert0\rangle+e^{\mp i\varphi}\vert1\rangle}
        {\sqrt{2}}
 
-    :param anc_outcomt: :math:`\pm1`, indicates eigenvalue observed on ancilla
+    :param anc_outcome: :math:`\pm1`, indicates eigenvalue observed on ancilla
                         z-measurement
     :param phi:         The strength of the interaction
     :returns:           The state represented in the standard computational (z)
@@ -25,9 +25,9 @@ def z_state(anc_outcome, phi):
 
     """
 
-    return sqrt(2)*np.array([1. + 0.j, exp(-1.j*anc_outcome*phi)])
+    return np.array([(1. + 0.j)*np.ones(anc_outcome.shape), exp(-1.j*anc_outcome*phi)])/sqrt(2)
 
-def y_state(anc_outcome, z_eigval, phi):
+def y_state(z_eigval, anc_outcome, phi):
     r"""Return the state corresponding to the projective measurement implied by
     a particular outcome (:math:`\pm1`) of the y-measurement on the ancilla and
     the z-eigenvalue (:math:`\widetilde{\pm}1` of the system basis element the
@@ -36,15 +36,16 @@ def y_state(anc_outcome, z_eigval, phi):
     .. math::
 
        \begin{align}
-       \vert\psi\rangle&=\cos\theta/2\vert0\rangle+\sin\theta/2\vert1\rangle
+       \vert\psi\rangle&=\cos\frac{\theta}{2}\vert0\rangle+
+       \sin\frac{\theta}{2}\vert1\rangle \\
        \theta&=\operatorname{arccos}\left(\widetilde{\pm}
        \frac{2\left\{\begin{array}{l r}\sin(\varphi+\pi/4) & + \\
        \cos(\varphi+\pi/4) & -\end{array}\right\}^2-1}{2\left\{\begin{array}
        {l r}\sin(\varphi+\pi/4) & + \\ \cos(\varphi+\pi/4) & -\end{array}
-       \right\}}\right)
+       \right\}^2+1}\right)
        \end{align}
 
-    :param anc_outcomt: :math:`\pm1`, indicates eigenvalue observed on ancilla
+    :param anc_outcome: :math:`\pm1`, indicates eigenvalue observed on ancilla
                         z-measurement
     :param phi:         The strength of the interaction
     :returns:           The state represented in the standard computational (z)
@@ -52,9 +53,36 @@ def y_state(anc_outcome, z_eigval, phi):
 
     """
 
-    if anc_outcome > 0:
-        sc = sin(phi + pi/4)
-    else:
-        sc = cos(phi + pi/4)
+    sc = np.where(anc_outcome > 0, sin(phi + pi/4), cos(phi + pi/4))
     theta = arccos((2*sc**2 - 1)/(2*sc**2 + 1))
     return np.array([cos(theta/2), sin(theta/2)])
+
+class DSTDistribution(object):
+    def __init__(self, phi):
+        self.phi = phi
+        self.y_plus_prob = (2*sin(phi + pi/2)**2 + 1)/4
+        pm = np.array([1, -1])
+        self.y_states = y_state(np.array([pm, pm]).T, np.array([pm, pm]), phi)
+        self.z_states = z_state(pm, phi)
+
+    def sample(self, n=1):
+        pm = np.array([1, -1])
+        # We will generate random inputs for the functions, but since the z
+        # states have one less free parameter we use a lambda to discard the
+        # unused z-eigenvalue
+        anc_meas = np.array([y_state, lambda anc_outcome, discard, phi:
+                             z_state(anc_outcome, phi)])
+        # This array stores the anc_outcome for z states or the z_eigval for y
+        # states
+        rand_pm_vals = np.random.choice(pm, n)
+        y_anc_outcomes = np.random.choice(pm, n, p=[self.y_plus_prob,
+                                                    1 - self.y_plus_prob])
+        rand_anc_meas = np.random.choice(anc_meas, n)
+        samples = [meas(pm_val, y_anc_outcome, self.phi) for meas, pm_val,
+                   y_anc_outcome in zip(rand_anc_meas, rand_pm_vals,
+                                        y_anc_outcomes)]
+
+        # Return samples as a (2,n)-shaped array with the first row being the
+        # 0-components of the states and the second row being the 1-components
+        # of the state
+        return np.array(samples).T
