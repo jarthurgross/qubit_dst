@@ -58,7 +58,17 @@ def y_state(z_eigval, anc_outcome, phi):
     return np.array([cos(theta/2), sin(theta/2)])
 
 class DSTDistribution(object):
+    """A class for sampling from the distribution of projective measurements
+    that makes up the POVM for DST
+
+    """
     def __init__(self, phi):
+        """Constructor
+
+        :param phi: The strength of the interaction
+
+        """
+
         self.phi = phi
         self.y_plus_prob = (2*sin(phi + pi/2)**2 + 1)/4
         pm = np.array([1, -1])
@@ -66,6 +76,17 @@ class DSTDistribution(object):
         self.z_states = z_state(pm, phi)
 
     def sample(self, n=1):
+        r"""Get samples from the distribution
+
+        :param n:   The number of samples to draw from the distribution
+        :returns:   A ``numpy.array`` of shape (2, n) where the first row
+                    contains the :math:`\vert0\rangle` coefficients and the
+                    second row contains the :math:`\vert1\rangle` coefficients
+                    for the states defining the projective measurements drawn
+                    from the distribution
+
+        """
+
         pm = np.array([1, -1])
         # We will generate random inputs for the functions, but since the z
         # states have one less free parameter we use a lambda to discard the
