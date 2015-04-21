@@ -15,7 +15,7 @@ def reseed_choice(a, size=None, replace=True, p=None):
 
     """
     np.random.seed()
-    return reseed_choice(a=a, size=size, replace=replace, p=p)
+    return np.random.choice(a=a, size=size, replace=replace, p=p)
 
 def z_state(anc_outcome, phi):
     r"""Return the state corresponding to the projective measurement implied by
