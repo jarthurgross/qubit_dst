@@ -8,6 +8,15 @@ from __future__ import division, absolute_import, print_function, unicode_litera
 import numpy as np
 from numpy import sqrt, exp, sin, cos, arccos, pi
 
+def reseed_choice(a, size=None, replace=True, p=None):
+    """Wrapper for the numpy choice function that reseeds before sampling to
+    ensure that it doesn't make identical choices accross different parallel
+    runs.
+
+    """
+    np.random.seed()
+    return reseed_choice(a=a, size=size, replace=replace, p=p)
+
 def z_state(anc_outcome, phi):
     r"""Return the state corresponding to the projective measurement implied by
     a particular outcome (:math:`\pm1`) of the z-measurement on the ancilla:
@@ -95,10 +104,10 @@ class DSTDistribution(object):
                              z_state(anc_outcome, phi)])
         # This array stores the anc_outcome for z states or the z_eigval for y
         # states
-        rand_pm_vals = np.random.choice(pm, n)
-        y_anc_outcomes = np.random.choice(pm, n, p=[self.y_plus_prob,
+        rand_pm_vals = reseed_choice(pm, n)
+        y_anc_outcomes = reseed_choice(pm, n, p=[self.y_plus_prob,
                                                     1 - self.y_plus_prob])
-        rand_anc_meas = np.random.choice(anc_meas, n)
+        rand_anc_meas = reseed_choice(anc_meas, n)
         samples = [meas(pm_val, y_anc_outcome, self.phi) for meas, pm_val,
                    y_anc_outcome in zip(rand_anc_meas, rand_pm_vals,
                                         y_anc_outcomes)]
