@@ -10,8 +10,9 @@ def check_state_norms(samples):
 def check_states_unique(states):
     # Verify that the states generated are unique
     for state1, state2 in combinations(states, 2):
-        diffs = state1.conj().dot(state2)
-        assert_true(diffs > 1e-7)
+        diff = state1 - state2
+        diff_mag = diff.conj().dot(diff)
+        assert_true(diff_mag > 1e-7)
 
 def test_sampling():
     phis = [0, 1, 2]
@@ -23,8 +24,8 @@ def test_sampling():
 def test_uniqueness():
     # Make sure all the states that are being sampled from are unique (except
     # for certain pathological cases)
-    phis = [0, 1, 2]
+    phis = [1, 2]
     for phi in phis:
         dist = samp.DSTDistribution(phi)
-        check_states_unique(dist.y_states.reshape((4, 2)))
+        check_states_unique(dist.y_states.reshape((2, 4)).T)
         check_states_unique(dist.z_states)
