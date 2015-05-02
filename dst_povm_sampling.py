@@ -47,11 +47,10 @@ def x_state(anc_outcome, sys_outcome, phi):
                                               -sin(phi)**2), 0)
     return np.array([cos(theta/2), sin(theta/2)])
 
-def y_state(z_eigval, anc_outcome, phi):
+def y_state(anc_outcome, sys_outcome, phi):
     r"""Return the state corresponding to the projective measurement implied by
     a particular outcome (:math:`\pm1`) of the y-measurement on the ancilla and
-    the z-eigenvalue (:math:`\widetilde{\pm}1`) of the system basis element the
-    ancilla coupled to:
+    a particular outcome on the system (:math:`\widetilde{\pm}1`):
 
     .. math::
 
@@ -67,6 +66,8 @@ def y_state(z_eigval, anc_outcome, phi):
 
     :param anc_outcome: :math:`\pm1`, indicates eigenvalue observed on ancilla
                         z-measurement
+    :param sys_outcome: :math:`\widetilde{\pm}1`, indicates eigenvalue observed
+                        on system x-measurement
     :param phi:         The strength of the interaction
     :returns:           The state represented in the standard computational (z)
                         basis
@@ -74,7 +75,7 @@ def y_state(z_eigval, anc_outcome, phi):
     """
 
     sc = np.where(anc_outcome > 0, sin(phi + pi/4), cos(phi + pi/4))
-    theta = arccos((2*sc**2 - 1)/(2*sc**2 + 1))
+    theta = arccos(sys_outcome*(2*sc**2 - 1)/(2*sc**2 + 1))
     return np.array([cos(theta/2), sin(theta/2)])
 
 def z_state(anc_outcome, phi):
@@ -114,7 +115,8 @@ class DSTDistribution(object):
         pm = np.array([1, -1])
         # TODO: Fix these arrays so they can be used instead of calling the
         # functions a bunch of times in the sampling routines.
-        self.y_states = y_state(np.array([pm, pm]).T, np.array([pm, pm]), phi)
+        sys_outcomes, anc_outcomes = np.meshgrid(pm, pm)
+        self.y_states = y_state(anc_outcomes, sys_outcomes, phi)
         self.z_states = z_state(pm, phi)
 
     def sample(self, n=1):
@@ -135,8 +137,7 @@ class DSTDistribution(object):
         # unused z-eigenvalue
         anc_meas = np.array([y_state, lambda anc_outcome, discard, phi:
                              z_state(anc_outcome, phi)])
-        # This array stores the anc_outcome for z states or the z_eigval for y
-        # states
+        # This array stores the anc_outcome for y or z states
         rand_pm_vals = reseed_choice(pm, n)
         y_anc_outcomes = reseed_choice(pm, n, p=[self.y_plus_prob,
                                                     1 - self.y_plus_prob])
@@ -197,8 +198,7 @@ class DSTxyzDistribution(object):
         anc_meas = np.array([x_state, y_state,
                              lambda anc_outcome, discard, phi:
                              z_state(anc_outcome, phi)])
-        # This array stores the anc_outcome for z states, the z_eigval for y
-        # states, or the sys_outcome for x states
+        # This array stores the anc_outcome for x, y, or z states
         rand_pm_vals = reseed_choice(pm, n)
         x_anc_outcomes = reseed_choice(pm, n, p=[self.x_plus_prob,
                                                     1 - self.x_plus_prob])
@@ -207,7 +207,6 @@ class DSTxyzDistribution(object):
         # Randomize which measurement is performed on the ancilla (0->x, 1->y,
         # 2->z)
         # TODO: Make this part work
-        anc_meas_out = zip(
         rand_anc_meas = reseed_choice(anc_meas, n)
         samples = [meas(pm_val, y_anc_outcome, self.phi) for meas, pm_val,
                    y_anc_outcome in zip(rand_anc_meas, rand_pm_vals,
