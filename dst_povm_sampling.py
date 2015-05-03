@@ -6,7 +6,6 @@
 """
 from __future__ import division, absolute_import, print_function, unicode_literals
 import numpy as np
-from numpy import sqrt, exp, sin, cos, arccos, pi, arctan2
 from itertools import product
 
 def reseed_choice(a, size=None, replace=True, p=None):
@@ -44,9 +43,9 @@ def x_state(anc_outcome, sys_outcome, phi):
 
     """
 
-    theta = np.where(sys_outcome > 0, arctan2(2*sys_outcome*cos(phi),
-                                              -sin(phi)**2), 0)
-    return np.array([cos(theta/2), sin(theta/2)])
+    theta = np.where(anc_outcome > 0, np.arctan2(2*sys_outcome*np.cos(phi),
+                                                 -np.sin(phi)**2), 0)
+    return np.array([np.cos(theta/2), np.sin(theta/2)])
 
 def y_state(anc_outcome, sys_outcome, phi):
     r"""Return the state corresponding to the projective measurement implied by
@@ -75,9 +74,9 @@ def y_state(anc_outcome, sys_outcome, phi):
 
     """
 
-    sc = np.where(anc_outcome > 0, sin(phi + pi/4), cos(phi + pi/4))
-    theta = arccos(sys_outcome*(2*sc**2 - 1)/(2*sc**2 + 1))
-    return np.array([cos(theta/2), sin(theta/2)])
+    sc = np.where(anc_outcome > 0, np.sin(phi + np.pi/4), np.cos(phi + np.pi/4))
+    theta = np.arccos(sys_outcome*(2*sc**2 - 1)/(2*sc**2 + 1))
+    return np.array([np.cos(theta/2), np.sin(theta/2)])
 
 def z_state(anc_outcome, phi):
     r"""Return the state corresponding to the projective measurement implied by
@@ -97,7 +96,7 @@ def z_state(anc_outcome, phi):
     """
 
     return np.array([(1. + 0.j)*np.abs(anc_outcome),
-                     exp(-1.j*anc_outcome*phi)])/sqrt(2)
+                     np.exp(-1.j*anc_outcome*phi)])/np.sqrt(2)
 
 class DSTDistribution(object):
     """A class for sampling from the distribution of projective measurements
@@ -113,7 +112,7 @@ class DSTDistribution(object):
 
         # The projective measurement associated with different y-measurement
         # outcomes on the ancilla is chosen with a bias
-        y_plus_prob = (2*sin(phi + pi/2)**2 + 1)/4
+        y_plus_prob = (2*np.sin(phi + np.pi/2)**2 + 1)/4
 
         # The probabilities of each of the 6 projective measurements that might
         # be performed
@@ -151,7 +150,7 @@ class DSTxyzDistribution(object):
     :math:`\sigma_z` are all measured on the meter.
 
     """
-    def __init__(self, phi, anc_prob=[1/4, 1/4, 1/2]):
+    def __init__(self, phi, anc_probs=[1/4, 1/4, 1/2]):
         """Constructor
 
         :param phi: The strength of the interaction
@@ -162,16 +161,34 @@ class DSTxyzDistribution(object):
 
         """
 
-        self.phi = phi
-        self.p = p
-        self.x_plus_prob = (cos(phi)**2 + 1)/2
-        self.y_plus_prob = (2*sin(phi + pi/2)**2 + 1)/4
+        # Normalize the probabilities
+        prob_norm = sum(anc_probs)
+        n_probs = [prob/prob_norm for prob in anc_probs]
+
+        # The projective measurements associated with different y- and
+        # x-measurement outcomes on the ancilla are chosen with biases
+        y_plus_prob = (2*np.sin(phi + np.pi/2)**2 + 1)/4
+        x_plus_prob = (np.cos(phi)**2 + 1)/2
+
+        # The probabilities of each of the 10 projective measurements that might
+        # be performed
+        self.probs = [n_probs[0]*x_plus_prob/2, n_probs[0]*x_plus_prob/2,
+                      n_probs[0]*(1 - x_plus_prob)/2,
+                      n_probs[0]*(1 - x_plus_prob)/2,
+                      n_probs[1]*y_plus_prob/2, n_probs[1]*y_plus_prob/2,
+                      n_probs[1]*(1 - y_plus_prob)/2,
+                      n_probs[1]*(1 - y_plus_prob)/2,
+                      n_probs[2]/2, n_probs[2]/2]
         pm = np.array([1, -1])
-        # TODO: Fix these arrays so they can be used instead of calling the
-        # functions a bunch of times in the sampling routines.
-        self.x_states = x_state(np.array([pm, pm]).T, np.array([pm, pm]), phi)
-        self.y_states = y_state(np.array([pm, pm]).T, np.array([pm, pm]), phi)
-        self.z_states = z_state(pm, phi)
+
+        # Measurement list (k_ancout_sysout): [y++, y+-, y-+, y--, z+, z-]
+        x_measurements = [x_state(ancout, sysout, phi) for ancout, sysout in
+                          product(pm, pm)]
+        y_measurements = [y_state(ancout, sysout, phi) for ancout, sysout in
+                          product(pm, pm)]
+        z_measurements = [z_state(ancout, phi) for ancout in pm]
+        self.measurements = np.array(x_measurements + y_measurements +
+                                     z_measurements)
 
     def sample(self, n=1):
         r"""Get samples from the distribution
@@ -185,28 +202,8 @@ class DSTxyzDistribution(object):
 
         """
 
-        pm = np.array([1, -1])
-        # We will generate random inputs for the functions, but since the z
-        # states have one less free parameter we use a lambda to discard the
-        # unused z-eigenvalue
-        anc_meas = np.array([x_state, y_state,
-                             lambda anc_outcome, discard, phi:
-                             z_state(anc_outcome, phi)])
-        # This array stores the anc_outcome for x, y, or z states
-        rand_pm_vals = reseed_choice(pm, n)
-        x_anc_outcomes = reseed_choice(pm, n, p=[self.x_plus_prob,
-                                                    1 - self.x_plus_prob])
-        y_anc_outcomes = reseed_choice(pm, n, p=[self.y_plus_prob,
-                                                    1 - self.y_plus_prob])
-        # Randomize which measurement is performed on the ancilla (0->x, 1->y,
-        # 2->z)
-        # TODO: Make this part work
-        rand_anc_meas = reseed_choice(anc_meas, n)
-        samples = [meas(pm_val, y_anc_outcome, self.phi) for meas, pm_val,
-                   y_anc_outcome in zip(rand_anc_meas, rand_pm_vals,
-                                        y_anc_outcomes)]
-
         # Return samples as a (2,n)-shaped array with the first row being the
         # 0-components of the states and the second row being the 1-components
         # of the state
-        return np.array(samples).T
+        indices = list(range(len(self.measurements)))
+        return self.measurements[reseed_choice(indices, n, p=self.probs)].T
