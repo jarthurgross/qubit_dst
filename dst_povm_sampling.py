@@ -7,6 +7,7 @@
 from __future__ import division, absolute_import, print_function, unicode_literals
 import numpy as np
 from numpy import sqrt, exp, sin, cos, arccos, pi, arctan2
+from itertools import product
 
 def reseed_choice(a, size=None, replace=True, p=None):
     """Wrapper for the numpy choice function that reseeds before sampling to
@@ -95,7 +96,7 @@ def z_state(anc_outcome, phi):
 
     """
 
-    return np.array([(1. + 0.j)*np.ones(anc_outcome.shape),
+    return np.array([(1. + 0.j)*np.abs(anc_outcome),
                      exp(-1.j*anc_outcome*phi)])/sqrt(2)
 
 class DSTDistribution(object):
@@ -110,14 +111,21 @@ class DSTDistribution(object):
 
         """
 
-        self.phi = phi
-        self.y_plus_prob = (2*sin(phi + pi/2)**2 + 1)/4
+        # The projective measurement associated with different y-measurement
+        # outcomes on the ancilla is chosen with a bias
+        y_plus_prob = (2*sin(phi + pi/2)**2 + 1)/4
+
+        # The probabilities of each of the 6 projective measurements that might
+        # be performed
+        self.probs = [y_plus_prob/4, y_plus_prob/4, (1 - y_plus_prob)/4,
+                      (1 - y_plus_prob)/4, 1/4, 1/4]
         pm = np.array([1, -1])
-        # TODO: Fix these arrays so they can be used instead of calling the
-        # functions a bunch of times in the sampling routines.
-        sys_outcomes, anc_outcomes = np.meshgrid(pm, pm)
-        self.y_states = y_state(anc_outcomes, sys_outcomes, phi)
-        self.z_states = z_state(pm, phi)
+
+        # Measurement list (k_ancout_sysout): [y++, y+-, y-+, y--, z+, z-]
+        y_measurements = [y_state(ancout, sysout, phi) for ancout, sysout in
+                          product(pm, pm)]
+        z_measurements = [z_state(ancout, phi) for ancout in pm]
+        self.measurements = np.array(y_measurements + z_measurements)
 
     def sample(self, n=1):
         r"""Get samples from the distribution
@@ -131,25 +139,11 @@ class DSTDistribution(object):
 
         """
 
-        pm = np.array([1, -1])
-        # We will generate random inputs for the functions, but since the z
-        # states have one less free parameter we use a lambda to discard the
-        # unused z-eigenvalue
-        anc_meas = np.array([y_state, lambda anc_outcome, discard, phi:
-                             z_state(anc_outcome, phi)])
-        # This array stores the anc_outcome for y or z states
-        rand_pm_vals = reseed_choice(pm, n)
-        y_anc_outcomes = reseed_choice(pm, n, p=[self.y_plus_prob,
-                                                    1 - self.y_plus_prob])
-        rand_anc_meas = reseed_choice(anc_meas, n)
-        samples = [meas(pm_val, y_anc_outcome, self.phi) for meas, pm_val,
-                   y_anc_outcome in zip(rand_anc_meas, rand_pm_vals,
-                                        y_anc_outcomes)]
-
         # Return samples as a (2,n)-shaped array with the first row being the
         # 0-components of the states and the second row being the 1-components
         # of the state
-        return np.array(samples).T
+        indices = list(range(len(self.measurements)))
+        return self.measurements[reseed_choice(indices, n, p=self.probs)].T
 
 class DSTxyzDistribution(object):
     """A class for sampling from the distribution of projective measurements
