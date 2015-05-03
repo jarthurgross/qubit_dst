@@ -1,7 +1,7 @@
 from nose.tools import assert_almost_equal, assert_equal, assert_true
 import numpy as np
 import qubit_dst.dst_povm_sampling as samp
-from itertools import combinations
+from itertools import combinations, product
 
 def check_state_norms(samples):
     diffs = np.sum(np.abs(samples)**2, axis=0) - np.ones(samples.shape[1])
@@ -18,6 +18,7 @@ def test_sampling():
     phis = [0, 1, 2]
     for phi in phis:
         dist = samp.DSTDistribution(phi)
+        assert_almost_equal(sum(dist.probs), 1, 7)
         samples = dist.sample(2**8)
         check_state_norms(samples)
 
@@ -25,7 +26,9 @@ def test_uniqueness():
     # Make sure all the states that are being sampled from are unique (except
     # for certain pathological cases)
     phis = [1, 2]
+    pm = [1, -1]
     for phi in phis:
-        dist = samp.DSTDistribution(phi)
-        check_states_unique(dist.y_states.reshape((2, 4)).T)
-        check_states_unique(dist.z_states)
+        y_states = [samp.y_state(ancout, sysout, phi) for ancout, sysout in
+                    product(pm, pm)]
+        z_states = [samp.z_state(ancout, phi) for ancout in pm]
+        check_states_unique(y_states + z_states)
