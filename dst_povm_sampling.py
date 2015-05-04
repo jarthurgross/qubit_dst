@@ -153,11 +153,14 @@ class DSTxyzDistribution(object):
     def __init__(self, phi, anc_probs=[1/4, 1/4, 1/2]):
         """Constructor
 
-        :param phi: The strength of the interaction
-        :param p:   List giving the probabilities of performing a
-                    :math:`\sigma_x`, :math:`\sigma_y`, or :math:`\sigma_z`
-                    measurement on the ancilla (should all be positive, but
-                    will automatically be normalized).
+        :param phi:         The strength of the interaction
+        :param anc_probs:   Probabilities of performing x, y, and z measurements
+                            on the ancilla (meter)
+        :param p:           List giving the probabilities of performing a
+                            :math:`\sigma_x`, :math:`\sigma_y`, or
+                            :math:`\sigma_z` measurement on the ancilla (should
+                            all be positive, but will automatically be
+                            normalized).
 
         """
 
