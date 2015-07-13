@@ -1,3 +1,7 @@
+qubit_dst.egg-info/*
+.eggs/*
+build/*
+dist/*
 __pycache__/*
 doc/_build/*
 _build/*
