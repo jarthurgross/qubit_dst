@@ -1,3 +1,4 @@
+from __future__ import division
 from nose.tools import assert_almost_equal, assert_equal, assert_true
 import numpy as np
 import qubit_dst.dst_povm_sampling as samp
